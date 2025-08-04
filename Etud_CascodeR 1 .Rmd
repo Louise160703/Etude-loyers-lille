@@ -1,0 +1,353 @@
+DATA Immo1.Immob ;
+    Set Immo1.Immob ;
+    Pm2 = round(Pm2, 1);
+    nvie = round(nvie, 1);
+    Partso = round(Partso, 1);
+    PartMp = round(PartMp, 1);
+Loyer = round(Loyer, 1) ;
+Surface = round(Surface,1) ;
+run ;
+ 
+/*supprimer les doublons */
+proc sort data=Immo1.Immob nodupkey;
+    by Pi_ces Loyer Surface Quartier Appartenance Pm2 ;
+run;
+ 
+data Immo1.Immob ;
+set Immo1.Immob;
+run;
+ 
+/*retirer la premiere ligne*/
+data Immo1.Immob;
+    set Immo1.Immob(firstobs=2);
+run;
+ 
+/*traitement des valeurs aberrantes*/
+proc sgplot data=Immo1.Immo;
+    vbox Loyer / category=Pi_ces;
+    title "Graphique de boîte à moustaches";
+run;
+ 
+proc sgplot data=Immo1.Immob;
+    vbox Surface / category=Pi_ces;
+    title "Graphique de boîte à moustaches";
+run;
+ 
+proc sgplot data=Immo1.Immob;
+    vbox Pm2;
+    title "Graphique de boîte à moustaches";
+run;
+ 
+ 
+/* Calcul des statistiques descriptives pour Loyer, Surface, et Pm2 */
+proc univariate data=Immo1.Immob noprint;
+    var Loyer Surface Pm2; /* Les variables continues à analyser */
+    output out=stats
+        p25=Loyer_Q1 Surface_Q1 Pm2_Q1
+        p75=Loyer_Q3 Surface_Q3 Pm2_Q3;
+run;
+ 
+/* Ajout des bornes pour chaque variable */
+data moustache;
+    set stats;
+    Loyer_Lower = Loyer_Q1 - 1.5 * (Loyer_Q3 - Loyer_Q1);
+    Loyer_Upper = Loyer_Q3 + 1.5 * (Loyer_Q3 - Loyer_Q1);
+    Surface_Lower = Surface_Q1 - 1.5 * (Surface_Q3 - Surface_Q1);
+    Surface_Upper = Surface_Q3 + 1.5 * (Surface_Q3 - Surface_Q1);
+    Pm2_Lower = Pm2_Q1 - 1.5 * (Pm2_Q3 - Pm2_Q1);
+    Pm2_Upper = Pm2_Q3 + 1.5 * (Pm2_Q3 - Pm2_Q1);
+run;
+ 
+data Immo1.Immob;
+    if _N_ = 1 then set moustache;
+    set Immo1.Immob;
+    if Loyer >= Loyer_Lower and Loyer <= Loyer_Upper and
+    Surface >= Surface_Lower and Surface <= Surface_Upper and
+    Pm2 >= Pm2_Lower and Pm2 <= Pm2_Upper;
+run;
+ 
+ 
+/*Cacher les variables de quartile */
+Data Immo1.Immob ;
+set Immo1.Immob ;
+drop Loyer_Q3 Pm2_Q3 Surface_Q3 Surface_Q3 Loyer_Q1 Surface_Q1 Pm2_Q1 Loyer_Lower Loyer_Upper Surface_Lower Surface_Upper Pm2_Lower Pm2_Upper ;
+run ;
+ 
+/*statistiqques descriptives*/
+Proc freq Data = Immo1.immob  ;
+table quartier ;
+run ;
+ 
+PROC MEANS DATA=Immo1.immob N MIN MAX MEAN MEDIAN STDDEV;
+    VAR surface pi_ces pm2 loyer nvie Partso partMp;
+RUN;
+ 
+PROC MEANS DATA=Immo1.immob N MIN MAX MEAN MEDIAN STDDEV;
+    CLASS quartier;
+    VAR surface pi_ces pm2 loyer nvie Partso partMp;
+RUN;
+ 
+PROC MEANS DATA=Immo1.immob N MIN MAX MEAN MEDIAN STDDEV;
+    CLASS pi_ces;
+    VAR surface pm2 loyer nvie Partso partMp;
+RUN;
+ 
+PROC MEANS DATA=Immo1.immob N MIN MAX MEAN MEDIAN STDDEV;
+    CLASS pi_ces;
+    VAR surface pm2 loyer nvie Partso partMp;
+RUN;
+ 
+PROC MEANS DATA=Immo1.immob N MIN MAX MEAN MEDIAN STDDEV;
+    CLASS appartenance;
+    VAR surface pi_ces pm2 loyer nvie Partso partMp;
+RUN;
+ 
+PROC TABULATE DATA=Immo1.immob;
+    CLASS quartier pi_ces;
+    VAR surface pm2 loyer nvie Partso partMp;
+    TABLE quartier,
+          pi_ces*(surface pm2 loyer nvie Partso partMp)*(MEAN MEDIAN STDDEV);
+RUN;
+ 
+PROC TABULATE DATA=Immo1.immob;
+    CLASS quartier appartenance;
+    VAR surface pm2 loyer nvie Partso partMp;
+    TABLE quartier,
+          appartenance*(N MEAN MEDIAN STDDEV)*(surface pm2 loyer nvie Partso partMp);
+RUN;
+ 
+PROC MEANS DATA=Immo1.immob NOPRINT;
+    CLASS pi_ces;
+    VAR pm2 surface loyer;
+    OUTPUT OUT=Immo1.min_max_pieces
+        MIN(pm2 surface loyer) = min_pm2 min_surface min_loyer
+        MAX(pm2 surface loyer) = max_pm2 max_surface max_loyer;
+RUN;
+ 
+PROC SGPANEL DATA=Immo1.immob;
+    PANELBY quartier;
+    HISTOGRAM surface / BINWIDTH=10;
+RUN;
+ 
+PROC SGPANEL DATA=Immo1.immob;
+    PANELBY quartier;
+    HISTOGRAM pm2 / BINWIDTH=2;
+RUN;
+ 
+PROC SGPANEL DATA=Immo1.immob;
+    PANELBY quartier;
+    HISTOGRAM loyer / BINWIDTH=100;
+RUN;
+ 
+/*test de corrélation et covariance*/
+PROC CORR DATA=Immo1.immob COV;
+    VAR loyer;
+    WITH surface pm2 pi_ces nvie PartMp Partso;
+RUN;
+ 
+PROC CORR DATA=Immo1.immob;
+    VAR surface loyer pm2 pi_ces nvie PartMp Partso;
+RUN;
+ 
+/* Remplacer les valeurs manquantes*/
+data Immo1.Immob;
+    set Immo1.Immob;
+    if missing(nvie) then nvie = 24975 ;
+    if missing(Partso) then Partso = 24 ;
+    if missing(PartMp) then PartMp = 13 ;
+run;
+ 
+/*faire les variables dummies et de classes */
+DATA Immo1.immob;
+    SET Immo1.immob;
+quartier = LOWCASE(quartier);
+    armentieres = 0;
+    bois_blancs = 0;
+    cormontaigne = 0;
+    fives = 0;
+    hellemes = 0;
+    la_madeleine = 0;
+    lambersart = 0;
+    lille_centre = 0;
+    lille_sud = 0;
+    vieux_lille = 0;
+    Lomme = 0;
+    loos = 0;
+    marcq_en_baroeul = 0;
+    mons = 0;
+    moulins = 0;
+    ronchin = 0;
+    saint_maurice = 0;
+    tourcoing = 0;
+    vauban = 0;
+    villeneuve_d_ascq = 0;
+    wasquehal = 0;
+    wazemmes = 0;
+    IF quartier = "armentieres" THEN armentieres = 1;
+    ELSE IF quartier = "bois blancs" THEN bois_blancs = 1;
+    ELSE IF quartier = "cormontaigne" THEN cormontaigne = 1;
+    ELSE IF quartier = "fives" THEN fives = 1;
+    ELSE IF quartier = "hellemes" THEN hellemes = 1;
+    ELSE IF quartier = "la madeleine" THEN la_madeleine = 1;
+    ELSE IF quartier = "lambersart" THEN lambersart = 1;
+    ELSE IF quartier = "lille centre" THEN lille_centre = 1;
+    ELSE IF quartier = "lille sud" THEN lille_sud = 1;
+    ELSE IF quartier = "vieux lille" THEN vieux_lille = 1;
+    ELSE IF quartier = "Lomme" THEN Lomme = 1;
+    ELSE IF quartier = "loos" THEN loos = 1;
+    ELSE IF quartier = "marcq en baroeul" THEN marcq_en_baroeul = 1;
+    ELSE IF quartier = "mons" THEN mons = 1;
+    ELSE IF quartier = "moulins" THEN moulins = 1;
+    ELSE IF quartier = "ronchin" THEN ronchin = 1;
+    ELSE IF quartier = "saint maurice" THEN saint_maurice = 1;
+    ELSE IF quartier = "tourcoing" THEN tourcoing = 1;
+    ELSE IF quartier = "vauban" THEN vauban = 1;
+    ELSE IF quartier = "villeneuve d'ascq" THEN villeneuve_d_ascq = 1;
+    ELSE IF quartier = "wasquehal" THEN wasquehal = 1;
+    ELSE IF quartier = "wazemmes" THEN wazemmes = 1;
+RUN;
+ 
+DATA Immo1.immob;
+    SET Immo1.immob;
+ 
+    /* Création des variables dummies pour l'appartenance */
+    appartenance_oui = (Appartenance = "Oui");
+    appartenance_non = (appartenance = "Non");
+RUN;
+ 
+DATA Immo1.immob;
+    SET Immo1.immob;
+ 
+    /* Intervalles pour surface */
+    surface_classe1 = (surface < 40);
+    surface_classe2 = (40 <= surface < 55);
+    surface_classe3 = (surface >= 55);
+ 
+    /* Intervalles pour pm2 */
+    pm2_classe1 = (pm2 < 8);
+    pm2_classe2 = (8 <= pm2 <10);
+    pm2_classe3 = (pm2 >= 10);
+ 
+    /* Intervalles pour loyer */
+    loyer_classe1 = (loyer < 350);
+    loyer_classe2 = (350 <= loyer < 500);
+    loyer_classe3 = (loyer >= 500);
+Run ;
+ 
+    /* Classes (1, 2, 3) basées sur les intervalles */
+DATA Immo1.immob;
+    SET Immo1.immob;
+ 
+    /* Création de la variable surface_classe */
+    IF surface_classe1 = 1 THEN surface_classe = 1;
+    ELSE IF surface_classe2 = 1 THEN surface_classe = 2;
+    ELSE IF surface_classe3 = 1 THEN surface_classe = 3;
+ 
+    /* Création de la variable pm2_classe */
+    IF pm2_classe1 = 1 THEN pm2_classe = 1;
+    ELSE IF pm2_classe2 = 1 THEN pm2_classe = 2;
+    ELSE IF pm2_classe3 = 1 THEN pm2_classe = 3;
+ 
+    /* Création de la variable loyer_classe */
+    IF loyer_classe1 = 1 THEN loyer_classe = 1;
+    ELSE IF loyer_classe2 = 1 THEN loyer_classe = 2;
+    ELSE IF loyer_classe3 = 1 THEN loyer_classe = 3;
+RUN;
+ 
+ 
+DATA Immo1.immob;
+    SET Immo1.immob;
+ 
+    /* Création des variables dummies pour le nombre de pièces */
+    pieces_1 = (pi_ces = 1);
+    pieces_2 = (pi_ces = 2);
+    pieces_3 = (pi_ces = 3);
+    pieces_4 = (pi_ces = 4);
+    pieces_5plus = (pi_ces IN (5, 6, 7, 8));
+RUN;
+ 
+proc freq data =Immo1.Immob ;
+table surface_classe1 surface_classe2 surface_classe3 pm2_classe1 pm2_classe2 pm2_classe3
+loyer_classe1 loyer_classe2 loyer_classe3 pieces_1 pieces_2 pieces_3 pieces_4 pieces_5plus;
+run;
+ 
+ 
+/*séparation de la série en deux en fonction de l'appartennce */
+DATA Immo1.immob_oui Immo1.immob_non;
+    SET Immo1.immob;
+ 
+    /* Séparation en fonction de l'appartenance */
+    IF appartenance_oui = 1 THEN OUTPUT Immo1.immob_oui;
+    ELSE IF appartenance_non = 1 THEN OUTPUT Immo1.immob_non;
+RUN;
+ 
+ 
+/* Régression pour les logements appartenant à Immobill */
+Proc reg data=Immo1.Immob_oui;
+    Model Loyer = Surface Pi_ces Pm2 NVIE PartMp Partso
+        armentieres bois_blancs cormontaigne fives hellemes la_madeleine lambersart lille_sud vieux_lille loos
+        lomme marcq_en_baroeul mons moulins ronchin saint_maurice tourcoing vauban villeneuve_d_ascq wasquehal wazemmes
+        pieces_2 pieces_3 pieces_4 pieces_5plus surface_classe1 surface_classe3 pm2_classe1 pm2_classe3
+        / selection=stepwise slentry=0.05 slstay=0.05;
+    OUTPUT OUT=Immo1.Immob1 PREDICTED=Loyer_predit RESIDUAL=Residu;
+run;
+ 
+/* Régression pour les logements n'appartenant pas à Immobill */
+Proc reg data=Immo1.Immob_non;
+    Model Loyer = Surface Pi_ces Pm2 NVIE PartMp Partso
+        armentieres bois_blancs cormontaigne fives hellemes la_madeleine lambersart lille_sud vieux_lille loos
+        lomme marcq_en_baroeul moulins ronchin saint_maurice tourcoing vauban villeneuve_d_ascq wasquehal wazemmes
+        pieces_2 pieces_3 pieces_4 pieces_5plus surface_classe1 surface_classe3 pm2_classe1 pm2_classe3
+        / selection=stepwise slentry=0.05 slstay=0.05;
+    OUTPUT OUT=work.Immob_non_predit PREDICTED=Loyer_predit RESIDUAL=Residu;
+run;
+ 
+/* Fusion des groupes pour analyse comparative */
+DATA Immo1.Immob_comparaison;
+    SET Immo1.Immob_oui (IN=in_oui) Immo1.Immob_non (IN=in_non);
+    IF in_oui THEN Groupe = "Oui";
+    ELSE IF in_non THEN Groupe = "Non";
+ 
+    /* Classification des loyers */
+    IF Loyer < 350 THEN DO;
+        classe_prix = "Pas cher";
+        qualite_prix = 1;
+    END;
+    ELSE IF 350 <= Loyer <= 500 THEN DO;
+        classe_prix = "Raisonnable";
+        qualite_prix = 2;
+    END;
+    ELSE DO;
+        classe_prix = "Cher";
+        qualite_prix = 3;
+    END;
+RUN;
+ 
+/* Visualisations et analyses comparatives */
+PROC MEANS DATA=Immo1.Immob_comparaison;
+    CLASS Groupe classe_prix;
+    VAR Loyer;
+    TITLE "Comparaison des loyers moyens par classe de prix entre les groupes";
+RUN;
+ 
+PROC SGPLOT DATA=Immo1.Immob_comparaison;
+    VBAR classe_prix / GROUP=Groupe RESPONSE=Loyer STAT=MEAN DATALABEL;
+    TITLE "Comparaison des prix moyens entre Appartenance 'Oui' et 'Non'";
+RUN;
+ 
+PROC SGPLOT DATA=Immo1.Immob_comparaison;
+    VBOX Loyer / CATEGORY=Groupe GROUP=classe_prix;
+    TITLE "Distribution des loyers par groupe et classe de prix";
+RUN;
+ 
+PROC FREQ DATA=Immo1.Immob_comparaison;
+    TABLES Groupe*classe_prix / CHISQ;
+    TITLE "Comparaison des proportions entre les classes de prix pour les groupes";
+RUN;
+ 
+PROC CORR DATA=Immo1.Immob_comparaison PLOTS(MAXPOINTS=10000);
+    VAR Loyer qualite_prix;
+    TITLE "Corrélations entre loyers et qualité de prix par groupe";
+RUN;
+proc print; run;
+ 
